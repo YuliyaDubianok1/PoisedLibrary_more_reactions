@@ -9,80 +9,48 @@ import sys
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
-m = Chem.MolFromSmiles('CCCCS') #input molecule ----butanol
-sub_str = Chem.MolFromSmarts('[CX4;!H0][OH1]')
-if m.HasSubstructMatch(sub_str):#substructure
-    oxidation_state = input("What is the desired oxidation state? Type 1 for aldehyde/ketone and 2 for carboxylic acid.")
+# Take molecule
 
-    if oxidation_state == 1:
-        rxn = AllChem.ReactionFromSmarts('[CX4;!H0:1][OH1:2]>>[C:1]=[O:2]') #aldehyde or keton
-        product = rxn.RunReactants((Chem.MolFromSmiles('CCCCS'),))
-        print Chem.MolToSmiles(product[0][0])
-        
-    elif oxidation_state == 2:
-        rxn = AllChem.ReactionFromSmarts('[CX4;!H0:1][OH1:3]>>[OXH:3][CX4:1]=[O:2]') #carboxylic acid
-        product = rxn.RunReactants((Chem.MolFromSmiles('CCCCS'),))
-        print Chem.MolToSmiles(product[0][0])
-    else:
-        print "Error. Please pick 1 or 2."
-    
-else:
-    print "Error! This is not the right substructure. No further oxidation possible. How is your chemistry?"
+def mol_input(mol_str):
+    mol = Chem.MolFromSmiles(mol_str)
+    if mol is None:
+        raise ValueError('Molecule is None from ', mol_str)
+    return mol
+
+# Check substructure
+def collection_reagents():
+    return {'[CX4;!H0][OH1]':['[CX4;!H0:1][OH1:2]>>[C:1]=[O:2]','[CX4;!H0:1][OH1:3]>>[OXH:3][CX4:1]=[O:2]'],
+            #'[C,c][SH1]':['[C,c:1][SH1:2].[CX4;!H0:3][Br:4]>>[C:1][S:2][C:3].[Br:4]','[C,c:1][SH1:2].[CX4;H2,H1:4][SH1:3]>>[C,c:1][S:2][S:3][C:4]'],
+            '[SX2][C]': ['[SX2:1][C:2]>>[C:2][S:1]=[O:3]']}
 
 
-# In[2]:
+def check_for_substructure(mol):
+    react_dict = collection_reagents()
+    outlist = []
+    for substructure in react_dict:
+        mol_substr = Chem.MolFromSmarts(substructure)
+        if mol.HasSubstructMatch(mol_substr):
+            outlist.extend(react_dict[substructure])
+    return outlist
 
-### -----  Thioether formation ----  ####
+# Reaction
+def react(outlist, mol):
+    prod_list = []
+    for react_str in outlist:
+        rxn = AllChem.ReactionFromSmarts(react_str)
+        product = rxn.RunReactants((mol,))
+        prod_list.append(Chem.MolToSmiles(product[0][0]))
+    return prod_list
 
-import sys
-from rdkit import Chem
-from rdkit.Chem import AllChem
-
-m = Chem.MolFromSmiles('CCS') #input molecule --- thioether
-sub_str = Chem.MolFromSmarts('[C,c][SH1]')
-if m.HasSubstructMatch(sub_str):#substructure
-    rxn = AllChem.ReactionFromSmarts('[C,c:1][SH1:2].[CX4;!H0:3][Br:4]>>[C:1][S:2][C:3].[Br:4]') #thioether
-    product = rxn.RunReactants((Chem.MolFromSmiles('CCS'), Chem.MolFromSmiles('CBr')))
-    print Chem.MolToSmiles(product[0][0])
-
-else:
-    print "Error! This is not the right substructure. No thioether formation is possible. How is your chemistry?"
-
-
-# In[3]:
-
-### -----  Disulfide formation ----  ####
-
-import sys
-from rdkit import Chem
-from rdkit.Chem import AllChem
-
-m = Chem.MolFromSmiles('CCCCS') #input molecule --- thioether
-sub_str = Chem.MolFromSmarts('[C,c][SH1]')
-if m.HasSubstructMatch(sub_str):#substructure
-    rxn = AllChem.ReactionFromSmarts('[C,c:1][SH1:2].[CX4;H2,H1:4][SH1:3]>>[C,c:1][S:2][S:3][C:4]') #disulfide
-    product = rxn.RunReactants((Chem.MolFromSmiles('CCCS'), Chem.MolFromSmiles('CCCS')))
-    print Chem.MolToSmiles(product[0][0])
-
-else:
-    print "Error! This is not the right substructure. No disulfide formation is possible. How is your chemistry?"
+def react_str(mol_str):
+    mol =  mol_input(mol_str)
+    outlist = check_for_substructure(mol)
+    prod_list = react(outlist, mol)
+    return prod_list
 
 
-# In[4]:
-
-### -----  Sulfoxide formation ----  ####
-
-import sys
-from rdkit import Chem
-from rdkit.Chem import AllChem
-
-m = Chem.MolFromSmiles('CSC') #input molecule --- thioether
-sub_str = Chem.MolFromSmarts('[SX2][C]')
-if m.HasSubstructMatch(sub_str):#substructure
-    rxn = AllChem.ReactionFromSmarts('[SX2:1][C:2]>>[C:2][S:1]=[O:3]') #disulfide
-    product = rxn.RunReactants((Chem.MolFromSmiles('CSC'),))
-    print Chem.MolToSmiles(product[0][0])
-
-else:
-    print "Error! This is not the right substructure. No disulfide formation is possible. How is your chemistry?"
-
+if __name__ == "__main__":
+    mol_str = sys.argv[1]
+    prod_list = react_str(mol_str)
+    for prod in prod_list:
+        print prod
